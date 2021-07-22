@@ -1,0 +1,126 @@
+setwd("/Users/michaelcolellajensen/Desktop/R")
+require(dplyr)
+require(readr)
+require(ggplot2)
+require(stargazer)
+require(lfe)
+require(tidyr)
+
+uber <- read.csv('/Users/michaelcolellajensen/Desktop/uber_case.csv')
+colnames(uber)
+str(uber)
+
+#histograms
+total_match_hist <- ggplot(data=uber,
+                          aes(x=total_matches, fill=wait_time))+
+  geom_histogram(bins = 20)+
+  labs(title = 'Total Matches by Wait Time',
+       x= 'Total Matches',
+       fill = 'Wait Time')
+total_match_hist
+cancellations_hist <- ggplot(data = uber,
+                             aes(x=rider_cancellations, fill=wait_time))+
+  geom_histogram(bins=15)+
+  labs(title = 'Cancellations by Wait Time',
+       x= 'Rider Cancellations',
+       fill = 'Wait Times')
+cancellations_hist
+driver_payout_hist <- ggplot(data = uber, 
+                             aes(x=total_driver_payout, fill=wait_time))+
+  geom_histogram(bins=20)+
+  labs(title = 'Driver Payout by Wait Time',
+       x= 'Total Payout',
+       fill = 'Wait Times')
+driver_payout_hist
+
+#t test two variables wait time vs rider cancellations
+cancellations <- uber%>%
+  select(rider_cancellations, wait_time)
+t.test(data=cancellations, rider_cancellations ~ wait_time)
+#t test shows a statistically significant difference 
+#plot the relationship
+cancellations_graph <- ggplot(data=uber, 
+                              aes(x=rider_cancellations, fill=wait_time))+
+  geom_density(alpha=.5)+
+  labs(title = 'Cancellation Distripution by Wait Time',
+       x='Number of Cancellations',
+       fill= 'Wait time')
+cancellations_graph
+
+#t test two variables wait time vs driver payout
+payout <- uber%>%
+  select(total_driver_payout, wait_time)
+t.test(data=payout, total_driver_payout ~ wait_time)
+#t test shows a statistically significant difference 
+payout_graph <- ggplot(data=uber,
+                       aes(x=total_driver_payout, fill=wait_time))+
+  geom_density(alpha=.5)+
+  labs(title='Driver Payout Distribution by Wiat Time',
+       x='Total Driver Payout',
+       fill = 'Wait time')
+payout_graph
+
+#t test total trip matches to see if wait time effects the total matches
+total_trip <- uber%>%
+  select(total_matches, wait_time)
+t.test(data=total_trip, total_matches ~ wait_time)
+#total matches is not statistically effected by wait time 
+
+#heat map of high traffic times
+uber <- uber%>%
+  separate(period_start, c('period_date', 'period_time'), ' ')
+total_trips_heatmap <- ggplot(data=uber,
+                              aes(x=period_date, 
+                                  y=period_time, 
+                                  fill=total_matches))+
+  geom_bin2d()+
+  labs(title = 'Heatmap of high traffic times',
+       x='Date', 
+       y='Time of Day',
+       fill = 'Total Matches')+
+  scale_fill_gradient2(low='lightgreen', high = 'darkgreen')
+total_trips_heatmap
+#from the heat map we see times 15:00 and 7:00 are high traffic times
+
+#does running analysis during high traffic times change analysis? 
+uber_traffic <- uber%>%
+  filter(commute == TRUE)
+uber_traffic <- uber_traffic%>%
+  select(rider_cancellations, wait_time)
+t.test(data=uber_traffic, rider_cancellations ~ wait_time)
+#cancellations spike during rush hour times at 5 min wait 
+
+uber_traffic_payout <- uber%>%
+  filter(commute == TRUE)
+uber_traffic_payout <- uber_traffic_payout%>%
+  select(total_driver_payout, wait_time)
+t.test(data=uber_traffic_payout, total_driver_payout ~ wait_time)
+#driver payout during rush hour is similar to overall data
+
+#looking for a relationship between trip type and driver payout 
+pool_payout <- ggplot(data=uber, 
+                 aes(x=trips_pool,
+                     y=total_driver_payout,
+                     fill=wait_time))+
+  geom_point(aes(color=wait_time))+
+  geom_smooth(method = 'lm', col = 'darkgrey')
+pool_payout
+express_payout <- ggplot(data=uber, 
+                         aes(x=trips_express,
+                             y=total_driver_payout,
+                             fill=wait_time))+
+  geom_point(color=wait_time)+
+  geom_smooth(method = 'lm', color = 'darkgrey')
+express_payout
+#the relationship between express trips and driver payout is much closer
+#suggesting that express trips are a better payment model for Uber
+
+#clear libraries and environment 
+detach(dplyr)
+detach(readr)
+detach(ggplot2)
+detach(stargazer)
+detach(lfe)
+detach(tidyr)
+cat("\014")
+rm(list = 1st())
