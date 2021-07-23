@@ -10,29 +10,37 @@ uber <- read.csv('/Users/michaelcolellajensen/Desktop/uber_case.csv')
 colnames(uber)
 str(uber)
 
-#histograms
-total_match_hist <- ggplot(data=uber,
-                          aes(x=total_matches, fill=wait_time))+
+#add a column for total trips 
+uber <- uber%>%
+  mutate(total_trips = trips_express + trips_pool)
+
+#histograms of total trips, cancellations, and payouts by wait time
+total_trip_hist <- ggplot(data=uber,
+                          aes(x=total_trips, 
+                              fill=wait_time))+
   geom_histogram(bins = 20)+
-  labs(title = 'Total Matches by Wait Time',
-       x= 'Total Matches',
+  labs(title = 'Total Trips by Wait Time',
+       x= 'Total Trips',
        fill = 'Wait Time')
-total_match_hist
+total_trip_hist
 cancellations_hist <- ggplot(data = uber,
-                             aes(x=rider_cancellations, fill=wait_time))+
+                             aes(x=rider_cancellations,
+                                 fill=wait_time))+
   geom_histogram(bins=15)+
   labs(title = 'Cancellations by Wait Time',
        x= 'Rider Cancellations',
        fill = 'Wait Times')
 cancellations_hist
 driver_payout_hist <- ggplot(data = uber, 
-                             aes(x=total_driver_payout, fill=wait_time))+
+                             aes(x=total_driver_payout,
+                                 fill=wait_time))+
   geom_histogram(bins=20)+
   labs(title = 'Driver Payout by Wait Time',
        x= 'Total Payout',
        fill = 'Wait Times')
 driver_payout_hist
 
+#t test to find any statistically significant correlations in wait time 
 #t test two variables wait time vs rider cancellations
 cancellations <- uber%>%
   select(rider_cancellations, wait_time)
@@ -40,7 +48,8 @@ t.test(data=cancellations, rider_cancellations ~ wait_time)
 #t test shows a statistically significant difference 
 #plot the relationship
 cancellations_graph <- ggplot(data=uber, 
-                              aes(x=rider_cancellations, fill=wait_time))+
+                              aes(x=rider_cancellations, 
+                                  fill=wait_time))+
   geom_density(alpha=.5)+
   labs(title = 'Cancellation Distripution by Wait Time',
        x='Number of Cancellations',
@@ -51,7 +60,8 @@ cancellations_graph
 payout <- uber%>%
   select(total_driver_payout, wait_time)
 t.test(data=payout, total_driver_payout ~ wait_time)
-#t test shows a statistically significant difference 
+#t test shows a statistically significant difference
+#plot the relationship
 payout_graph <- ggplot(data=uber,
                        aes(x=total_driver_payout, fill=wait_time))+
   geom_density(alpha=.5)+
@@ -62,8 +72,8 @@ payout_graph
 
 #t test total trip matches to see if wait time effects the total matches
 total_trip <- uber%>%
-  select(total_matches, wait_time)
-t.test(data=total_trip, total_matches ~ wait_time)
+  select(total_trips, wait_time)
+t.test(data=total_trip, total_trips ~ wait_time)
 #total matches is not statistically effected by wait time 
 
 #heat map of high traffic times
@@ -72,13 +82,14 @@ uber <- uber%>%
 total_trips_heatmap <- ggplot(data=uber,
                               aes(x=period_date, 
                                   y=period_time, 
-                                  fill=total_matches))+
+                                  fill=total_trips))+
   geom_bin2d()+
   labs(title = 'Heatmap of high traffic times',
        x='Date', 
        y='Time of Day',
-       fill = 'Total Matches')+
-  scale_fill_gradient2(low='lightgreen', high = 'darkgreen')
+       fill = 'Total Trips')+
+  scale_fill_gradient2(low='lightgreen', high = 'darkgreen')+
+  scale_y_discrete(limits = c('1:40', '4:20', '7:00', '9:40', '12:20', '15:00', '17:40', '20:20', '23:00'))
 total_trips_heatmap
 #from the heat map we see times 15:00 and 7:00 are high traffic times
 
@@ -95,25 +106,55 @@ uber_traffic_payout <- uber%>%
 uber_traffic_payout <- uber_traffic_payout%>%
   select(total_driver_payout, wait_time)
 t.test(data=uber_traffic_payout, total_driver_payout ~ wait_time)
-#driver payout during rush hour is similar to overall data
+#driver payout during rush hour is consistent to overall data
 
-#looking for a relationship between trip type and driver payout 
+# Regression test the relationship between trip type and driver payout
+reg_test_pool <- lm(trips_pool ~ total_driver_payout, data=uber)
+summary(reg_test_pool)
 pool_payout <- ggplot(data=uber, 
                  aes(x=trips_pool,
                      y=total_driver_payout,
                      fill=wait_time))+
-  geom_point(aes(color=wait_time))+
-  geom_smooth(method = 'lm', col = 'darkgrey')
+  geom_point(color=wait_time)+
+  geom_smooth(method = 'lm', col = 'darkgrey')+
+  labs(title = 'Relationship of Driver Payout to Pool Trips',
+       x= 'Number of Pool Trips', 
+       y= 'Total Diver Payout',
+       fill = 'Wait Time')
 pool_payout
+reg_test_express <- lm(trips_express ~ total_driver_payout, data=uber)
+summary(reg_test_express)
 express_payout <- ggplot(data=uber, 
                          aes(x=trips_express,
                              y=total_driver_payout,
                              fill=wait_time))+
   geom_point(color=wait_time)+
-  geom_smooth(method = 'lm', color = 'darkgrey')
+  geom_smooth(method = 'lm', color = 'darkgrey')+
+  labs(title = 'Relationship of Driver Payout to Express Trips',
+       x= 'Number of Express Trips',
+       y= 'Total Driver Payout',
+       fill = 'Wait Time ')
 express_payout
 #the relationship between express trips and driver payout is much closer
 #suggesting that express trips are a better payment model for Uber
+
+#REGRESSION FOR SIGNIFICANT DIFFERENCE###
+express <- uber%>%
+  select(trips_express, wait_time)
+r2 <- felm(data = express, log(trips_express)  ~ treat)
+r3 <- felm(data = payout, log(total_driver_payout)  ~ treat)
+r5 <- felm(data = cancellations, log(rider_cancellations)  ~ treat)
+stargazer(r2,r3,r5, type = "text" , title = "Baseline Results  - Trips in Logs", 
+          dep.var.labels = c('Tot Trips' , 'Express Pool Trips') ,
+          out = "base_results_log2021.txt")
+
+#REGRESSION FOR SIGNIFICANT DIFFERENCE W/O LOG###
+r2 <- felm(data = express, trips_express  ~ treat)
+r3 <- felm(data = payout, total_driver_payout  ~ treat)
+r5 <- felm(data = cancellations, rider_cancellations  ~ treat)
+stargazer(r2,r3,r5, type = "text" , title = "Baseline Results  - Trips in Logs", 
+          dep.var.labels = c('Tot Trips' , 'Express Pool Trips') ,
+          out = "base_results_level2021.txt")
 
 #clear libraries and environment 
 detach(dplyr)
@@ -122,5 +163,7 @@ detach(ggplot2)
 detach(stargazer)
 detach(lfe)
 detach(tidyr)
+cat("\014")
+rm(list = ls())
 cat("\014")
 rm(list = 1st())
